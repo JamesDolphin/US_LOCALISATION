@@ -1,74 +1,86 @@
-import RPi.GPIO as GPIO                    #Import GPIO library
-import time                                #Import time library
-GPIO.setmode(GPIO.BCM)                     #Set GPIO pin numbering 
+import RPi.GPIO as GPIO  # Import GPIO library
+import time  # Import time library
+import threading
 
-TRIG = 13                                  #Associate pin 23 to TRIG
-ECHO = 15                                  #Associate pin 24 to ECHO
+GPIO.setmode(GPIO.BCM)  # Set GPIO pin numbering
 
-print ("Distance measurement in progress")
+TRIG = 14  # Associate pin 13 to TRIG
+ECHO1 = 15  # Associate pin 14 to ECHO
+ECHO2 = 18
+ECHO3 = 23
+ECHO4 = 24
 
-GPIO.setup(TRIG,GPIO.OUT)                  #Set pin as GPIO out
-GPIO.setup(ECHO,GPIO.IN)                   #Set pin as GPIO in
+CAL = 0  # Calibration (+- cm)
 
-while True:
+print("Measurement Started")
 
-  GPIO.output(TRIG, False)                 #Set TRIG as LOW
-  print ("Waitng For Sensor To Settle")
-  time.sleep(1)                            #Delay of 2 seconds
+GPIO.setup(TRIG, GPIO.OUT)  # Set pin as GPIO out
 
-  GPIO.output(TRIG, True)                  #Set TRIG as HIGH
-  
-  time.sleep(0.00001)                      #Delay of 0.00001 seconds
-  GPIO.output(TRIG, False)                 #Set TRIG as LOW
+GPIO.setup(ECHO1, GPIO.IN)  # Set pin as GPIO in
+GPIO.setup(ECHO2, GPIO.IN)  # Set pin as GPIO in
+GPIO.setup(ECHO3, GPIO.IN)  # Set pin as GPIO in
+GPIO.setup(ECHO4, GPIO.IN)  # Set pin as GPIO in
 
-  while GPIO.input(ECHO)==0:               #Check whether the ECHO is LOW
-    pulse_start = time.time()              #Saves the last known time of LOW pulse
 
-  while GPIO.input(ECHO)==1:               #Check whether the ECHO is HIGH
-    pulse_end = time.time()                #Saves the last known time of HIGH pulse 
+def dist_calc(echo):
+    GPIO.output(TRIG, True)  # Set TRIG as HIGH (start square wave)
+    time.sleep(0.00001)  # Delay of 0.00001 seconds (10 uS pulse)
+    GPIO.output(TRIG, False)  # Set TRIG as LOW (stop square wave)
 
-  pulse_duration = pulse_end - pulse_start #Get pulse duration to a variable
+    while GPIO.input(echo) == 0:  # Check whether the ECHO is LOW
+        pulse_start = time.time()  # Saves the last known time of LOW pulse
 
-  distance = pulse_duration *2 * 17150        #Multiply pulse duration by 17150 to get distance
-  distance = round(distance, 2)            #Round to two decimal points
+    while GPIO.input(echo) == 1:  # Check whether the ECHO is HIGH
+        pulse_end = time.time()  # Saves the last known time of HIGH pulse
 
-  if distance > 2 and distance < 400:      #Check whether the distance is within range
-    print ("Distance:",distance - 0.5,"cm")  #Print distance with 0.5 cm calibration
-  else:
-    print ("Out Of Range")                   #display out of rangeimport RPi.GPIO as GPIO
-import time
-GPIO.setmode(GPIO.BCM)
+    pulse_duration = pulse_end - pulse_start  # Get pulse duration to a variable
+    distance = pulse_duration * 17150  # Multiply pulse duration by 17150 to get distance
+    distance = round(distance, 4)  # Round to four decimal points
+    return distance
 
-TRIG = 13 
-ECHO = 15
 
-print ("Distance Measurement In Progress")
+def centroid(A, B, C):
+    xco = float((1 - C ** 2 + A ** 2) / 2)
+    yco = float((1 - B ** 2 + A ** 2) / 2)
 
-GPIO.setup(TRIG,GPIO.OUT)
-GPIO.setup(ECHO,GPIO.IN)
+    return xco, yco
 
-GPIO.output(TRIG, False)
-print ("Waiting For Sensor To Settle")
-time.sleep(2)
 
-GPIO.output(TRIG, True)
-time.sleep(0.00001)
-GPIO.output(TRIG, False)
+while True:  # Continuous operation
 
-while GPIO.input(ECHO)==0:
-  
-  pulse_start = time.time()
+    GPIO.output(TRIG, False)  # Set TRIG as LOW
+    time.sleep(2)  # Delay of 2 seconds for easier readings
 
-while GPIO.input(ECHO)==1:
-  print("here2")
-  pulse_end = time.time()
+    t1 = threading.Thread(target=dist_calc, args=ECHO1)
+    t2 = threading.Thread(target=dist_calc, args=ECHO2)
+    t3 = threading.Thread(target=dist_calc, args=ECHO3)
+    t4 = threading.Thread(target=dist_calc, args=ECHO4)
 
-pulse_duration = pulse_end - pulse_start
+    t1.start()
+    t2.start()
+    t3.start()
+    t4.start()
 
-distance = pulse_duration * 17150
+    t1.join()
+    t2.join()
+    t3.join()
+    t4.join()
 
-distance = round(distance, 2)
+    e1 = ECHO1.get()
+    e2 = ECHO2.get()
+    e3 = ECHO3.get()
+    e4 = ECHO4.get()
 
-print ("Distance:",distance,"cm")
+    array = [e1, e2, e3, e4]
 
-GPIO.cleanup()
+    array.sort()
+    xco, yco = centroid(array[0], array[1], array[2])
+
+
+
+    # if distance > 2 and distance < 400:  # Check whether the distance is within range
+    #  print
+    # "Distance:", distance - CAL, "cm"  # Print distance with CAL adjustment
+    # else:
+    #   print
+    #  "Out Of Range"  # display out of range
