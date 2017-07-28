@@ -1,6 +1,7 @@
 import RPi.GPIO as GPIO  # Import GPIO library
 import time  # Import time library
 import threading
+from multiprocessing.dummy import Pool as ThreadPool
 
 GPIO.setmode(GPIO.BCM)  # Set GPIO pin numbering
 
@@ -43,6 +44,9 @@ def centroid(A, B, C):
     xco = float((1 - C ** 2 + A ** 2) / 2)
     yco = float((1 - B ** 2 + A ** 2) / 2)
 
+    print(xco, yco)
+    return xco, yco
+
     return xco, yco
 
 
@@ -50,31 +54,26 @@ while True:  # Continuous operation
 
     GPIO.output(TRIG, False)  # Set TRIG as LOW
     time.sleep(2)  # Delay of 2 seconds for easier readings
+    array = []
+    pool = ThreadPool(processes=4)
+    results_task = [pool.apply_async(dist_calc, ()) for i in range(4)]
 
-    t1 = threading.Thread(target=dist_calc, args=ECHO1)
-    t2 = threading.Thread(target=dist_calc, args=ECHO2)
-    t3 = threading.Thread(target=dist_calc, args=ECHO3)
-    t4 = threading.Thread(target=dist_calc, args=ECHO4)
+    t1 = threading.Thread(target=dist_calc)
+    t2 = threading.Thread(target=dist_calc)
+    t3 = threading.Thread(target=dist_calc)
+    t4 = threading.Thread(target=dist_calc)
 
     t1.start()
     t2.start()
     t3.start()
     t4.start()
 
-    t1.join()
-    t2.join()
-    t3.join()
-    t4.join()
+    results = list(map(lambda r: r.get(), results_task))
 
-    e1 = ECHO1.get()
-    e2 = ECHO2.get()
-    e3 = ECHO3.get()
-    e4 = ECHO4.get()
+    results.sort()
+    print(results)
 
-    array = [e1, e2, e3, e4]
-
-    array.sort()
-    xco, yco = centroid(array[0], array[1], array[2])
+    xco, yco = centroid(results[0], results[1], results[2])
 
 
 
