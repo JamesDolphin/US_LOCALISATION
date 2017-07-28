@@ -32,6 +32,7 @@ def dist_calc(echo):
         pulse_start = time.time()  # Saves the last known time of LOW pulse
 
     while GPIO.input(echo) == 1:  # Check whether the ECHO is HIGH
+        
         pulse_end = time.time()  # Saves the last known time of HIGH pulse
 
     pulse_duration = pulse_end - pulse_start  # Get pulse duration to a variable
